@@ -1,0 +1,37 @@
+project: RA-PPO
+run_name: debug
+mode: offline
+
+env: CartPole-v0
+num_envs: 4
+
+max_interactions: 100_000
+max_ep_len: 200
+num_epochs: 1000
+update_frequency: 800 # self.max_ep_len * 4
+# ^ is also the buffer size ^ 
+eval_frequency: 800
+
+seed: 42
+device: cpu:0
+
+minibatch_size: 64
+num_updates: 10
+
+actor_lr: 3.0e-4
+critic_lr: 3.0e-4
+gamma: 0.99
+lam: 0.95
+clip_epsilon: 0.2
+
+use_entropy: True
+entropy_coef: 0.001
+
+hidden_size: 256
+
+# risk aware eta
+use_meta_eta: False
+iqr_threshold: 2. # 0.3
+eta: 0.5
+
+
