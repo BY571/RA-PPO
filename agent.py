@@ -96,28 +96,29 @@ class PPOAgent():
         rewards = rewards[..., None]
         dones = dones[..., None]
         log_probs_old = log_probs_old[..., None]
-        # Compute expected returns
-        expected_returns =  rewards[..., None] + self.gamma * next_quantiles * (1 - dones[..., None])
+
         # Compute advantages using GAE
-        advantages = self.vmap_gae(rewards, quantiles.mean(-2), next_quantiles.mean(-2), dones)
+        quant_advantage = self.vmap_gae(rewards[..., None].expand(-1, self.num_envs, 64, 1), quantiles, next_quantiles, dones[..., None].expand(-1, self.num_envs, 64, 1))
+        # advantages = self.vmap_gae(rewards, quantiles.mean(-2), next_quantiles.mean(-2), dones)
+        target_value = quant_advantage + quantiles
         
         # stack all the data
         states = states.reshape(-1, states.shape[-1])
         actions = actions.reshape(-1, actions.shape[-1])
         log_probs_old = log_probs_old.reshape(-1, log_probs_old.shape[-1])
-        advantages = advantages.reshape(-1, advantages.shape[-1])
-        expected_returns = expected_returns.reshape(-1, 64, expected_returns.shape[-1])
+        advantages = quant_advantage.mean(-2).reshape(-1, quant_advantage.shape[-1])
+        target_value = target_value.reshape(-1, 64, target_value.shape[-1])
 
         # PPO update loop
         for _ in range(self.num_updates):
             sample_indices = torch.randint(low=0, high=states.shape[0], size=(self.minibatch_size,))
-            loss_info = self._update(states[sample_indices], actions[sample_indices], log_probs_old[sample_indices], advantages[sample_indices], expected_returns[sample_indices])
+            loss_info = self._update(states[sample_indices], actions[sample_indices], log_probs_old[sample_indices], advantages[sample_indices], target_value[sample_indices])
 
         loss_info["eta"] = adapted_meta_eta.mean().item() if self.use_meta_eta else eta
         loss_info["iqr"] = iqr.mean().item()
         return loss_info
 
-    def _update(self, states, actions, log_probs_old, advantages, expected_returns):
+    def _update(self, states, actions, log_probs_old, advantages, target_value):
         log_probs, entropy = self.actor.evaluate_actions(states, actions.squeeze())
         quantiles, taus = self.critic(states)
 
@@ -129,7 +130,7 @@ class PPOAgent():
         if self.use_entropy:
             policy_loss -= 0.01 * entropy.mean()
         
-        td_errors = expected_returns.transpose(1,2) - quantiles
+        td_errors = target_value.transpose(1,2) - quantiles
         element_wise_huber_loss = self.calculate_huber_loss(td_errors) # (batch_size, 64, 64)
 
         quantile_huber_loss = self.calculate_quantile_huber_loss(element_wise_huber_loss, td_errors, taus) # (batch_size, 64, 64)
