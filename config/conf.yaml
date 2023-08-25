@@ -1,22 +1,23 @@
 project: RA-PPO
-run_name: debug
-mode: offline
+run_name: debug-eta0.5
+mode: online
 
 env: CartPole-v0
-num_envs: 4
+num_envs: 1
 
-max_interactions: 100_000
+max_interactions: 60_000
 max_ep_len: 200
-num_epochs: 1000
+num_episodes: 250
 update_frequency: 800 # self.max_ep_len * 4
 # ^ is also the buffer size ^ 
 eval_frequency: 800
 
-seed: 42
+seed: 43
 device: cpu:0
 
 minibatch_size: 64
-num_updates: 10
+# number of ppo updates is calculated internally as: rollout_len * num_envs / minibatch_size
+#num_updates: 10 
 
 actor_lr: 3.0e-4
 critic_lr: 3.0e-4
@@ -25,9 +26,9 @@ lam: 0.95
 clip_epsilon: 0.2
 
 use_entropy: True
-entropy_coef: 0.001
+entropy_coef: 0.01
 
-hidden_size: 256
+hidden_size: 64
 
 # risk aware eta
 use_meta_eta: False

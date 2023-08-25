@@ -1,6 +1,8 @@
+from multiprocessing import Pipe, Process
+
 import gym
 import numpy as np
-from multiprocessing import Process, Pipe
+
 
 class VecEnv:
     def __init__(self, env_name, num_envs):
@@ -18,31 +20,31 @@ class VecEnv:
     def _worker(self, remote, env):
         while True:
             cmd, data = remote.recv()
-            if cmd == 'step':
+            if cmd == "step":
                 obs, reward, done, info = env.step(data)
                 if done:
                     obs = env.reset()
                 remote.send((obs, reward, done, info))
-            elif cmd == 'reset':
+            elif cmd == "reset":
                 obs = env.reset()
                 remote.send(obs)
-            elif cmd == 'close':
+            elif cmd == "close":
                 remote.close()
                 break
 
     def step(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(("step", action))
         results = [remote.recv() for remote in self.remotes]
         obs, rewards, dones, infos = zip(*results)
         return np.array(obs), np.array(rewards), np.array(dones), infos
 
     def reset(self):
         for remote in self.remotes:
-            remote.send(('reset', None))
+            remote.send(("reset", None))
         obs = [remote.recv() for remote in self.remotes]
         return np.array(obs)
 
     def close(self):
         for remote in self.remotes:
-            remote.send(('close', None))
+            remote.send(("close", None))
